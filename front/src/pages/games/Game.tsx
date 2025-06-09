@@ -108,6 +108,7 @@ const Game = () => {
 
     socket.on("game_started", (option) => {
       setGameParams({ ...gameParams, ...option });
+      setResponses([]);
     });
 
     socket.on("game_stopped", (option) => {

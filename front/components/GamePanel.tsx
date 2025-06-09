@@ -11,7 +11,7 @@ interface GameParams {
   duration: number;
   startTime: number;
   state?: string;
-  players: string[];
+  players: { id: string; name: string }[];
 }
 
 export const GamePanel = ({

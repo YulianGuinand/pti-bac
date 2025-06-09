@@ -4,7 +4,7 @@ import { CardAction, CardDescription, CardTitle } from "./ui/card";
 
 interface GameHeaderProps {
   state: string;
-  players: string[];
+  players: { id: string; name: string }[];
   isHoster: boolean;
   id: string;
 }

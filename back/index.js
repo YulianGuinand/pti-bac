@@ -25,25 +25,31 @@ const games = {};
 
 io.on("connection", (socket) => {
   socket.on("get_id", () => {
-    console.log("Connected : ", socket.id);
     socket.emit("connected", socket.id);
   });
 
-  socket.on("create_game", (name) => {
+  socket.on("check_game", (gameId) => {
+    const game = games[gameId];
+    if (!game) {
+      socket.emit("error", "Game not found");
+    } else {
+      socket.emit("game_found", true);
+    }
+  });
+
+  socket.on("create_game", () => {
     const gameId = Math.random().toString(36).substr(2, 6);
     games[gameId] = {
-      players: [{ id: socket.id, name }],
+      players: [],
       host: socket.id,
       responses: [],
+      roundes: 0,
     };
     socket.join(gameId);
     socket.emit("game_created", gameId);
-
-    console.log("CREATED : ", games[gameId]);
   });
 
   socket.on("join_game", ({ gameId, name }) => {
-    console.log(gameId, name);
     if (games[gameId]) {
       // Ajoute le joueur a la liste des joueurs s'il n'y est pas déja
       const players = games[gameId].players;
@@ -62,8 +68,6 @@ io.on("connection", (socket) => {
         options: games[gameId],
         player: socket.id,
       });
-
-      console.log("JOINDED : ", games[gameId]);
     } else {
       socket.emit("error", "Game not found");
     }
@@ -97,8 +101,7 @@ io.on("connection", (socket) => {
     game.letter = letter;
     game.startTime = Date.now();
     game.duration = duration;
-
-    console.log("STARTED : ", games[gameId]);
+    game.roundes += 1;
 
     io.to(gameId).emit("game_started", games[gameId]);
   });
@@ -122,7 +125,6 @@ io.on("connection", (socket) => {
         // Informer les autres joueurs
         io.to(gameId).emit("player_quit", game);
       }
-      console.log("QUIT : ", game);
     });
   });
 
@@ -132,7 +134,6 @@ io.on("connection", (socket) => {
 
     if (game.state === "started") {
       game.state = "stopped";
-      console.log("STOPED : ", game);
       io.to(gameId).emit("game_stopped", game);
     } else {
       socket.emit("error", "game not started or already stopped");
@@ -143,7 +144,6 @@ io.on("connection", (socket) => {
     const game = games[gameId];
     if (!game) socket.emit("error", "Game not found");
     game.state = "finished";
-    console.log("FINISHED : ", game);
     io.to(gameId).emit("game_stopped", game);
   });
 
@@ -154,30 +154,78 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (game.responses.length === 0) {
-      game.responses.push({});
+    const playerId = socket.id;
+
+    // Déterminer le round actuel (index du dernier round en cours)
+    let currentRoundIndex = game.roundes - 1;
+
+    if (game.responses.length < game.roundes) {
+      game.responses.push([{ id: playerId, answers }]);
     }
 
-    if (typeof game.responses[game.responses.length - 1] !== "object") {
-      game.responses[game.responses.length - 1] = {};
+    const currentRound = game.responses[currentRoundIndex];
+
+    const hasAlreadySubmitted = currentRound.some(
+      (response) => response.id === socket.id
+    );
+
+    if (!hasAlreadySubmitted) {
+      currentRound.push({ id: socket.id, answers });
     }
 
-    if (!game.players.include(socket.id)) {
-      console.error(`Nom introuvable pour socket.id: ${socket.id}`);
-      return;
-    }
+    // // Vérifie si tous les joueurs ont répondu pour ce round
+    const allResponded =
+      game.responses[currentRoundIndex].length === game.players.length;
 
-    game.responses[game.responses.length - 1][socket.id] = answers;
-
-    console.log(game.responses);
-
-    if (Object.keys(game.responses).length === game.players.length) {
+    if (allResponded) {
       io.to(gameId).emit("all_responses_collected", game.responses);
+    }
+  });
+
+  socket.on("vote_pos", ({ key, playerId, gameId }) => {
+    const game = games[gameId];
+    if (!game) return;
+
+    const player = game.players.find((pl) => pl.id === playerId);
+    if (!player) return;
+
+    const roundIndex = Math.max(game.roundes - 1, 0);
+    const currentRound = game.responses[roundIndex];
+
+    const response = currentRound.find((res) => res.id === playerId);
+    if (!response) return;
+
+    const answer = response.answers[key];
+    if (!answer || answer.vote.includes(socket.id)) return;
+
+    answer.vote.push(socket.id);
+
+    io.to(gameId).emit("vote", game.responses);
+  });
+
+  socket.on("vote_neg", ({ key, playerId, gameId }) => {
+    const game = games[gameId];
+    if (!game) return;
+
+    const player = game.players.find((pl) => pl.id === playerId);
+    if (!player) return;
+
+    const roundIndex = Math.max(game.roundes - 1, 0);
+    const currentRound = game.responses[roundIndex];
+
+    const response = currentRound.find((res) => res.id === playerId);
+    if (!response) return;
+
+    const answer = response.answers[key];
+    if (!answer) return;
+
+    const voteIndex = answer.vote.indexOf(socket.id);
+    if (voteIndex !== -1) {
+      answer.vote.splice(voteIndex, 1);
+      io.to(gameId).emit("vote", game.responses);
     }
   });
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Backend is running on port ${PORT}`);
-});
+server.listen(PORT, () => {});

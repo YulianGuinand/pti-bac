@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GamePanel } from "../../../components/GamePanel";
+import { GameResponse } from "../../../components/GameResponse";
 import { StartScreen } from "../../../components/StartScreen";
 import { Button } from "../../../components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
+import { cn } from "../../../lib/utils";
 import socket from "../../sockets";
 
 interface GameParams {
@@ -31,7 +33,23 @@ interface GameParams {
   duration: number;
   startTime: number;
   state?: string;
-  players: string[];
+  players: { id: string; name: string }[];
+  roundes: number;
+}
+
+interface AnswersType {
+  prenom: { value: string; vote: string[] };
+  metier: { value: string; vote: string[] };
+  geographie: { value: string; vote: string[] };
+  marque: { value: string; vote: string[] };
+  animal: { value: string; vote: string[] };
+  aliment: { value: string; vote: string[] };
+  celebrite: { value: string; vote: string[] };
+}
+
+interface ResponsesType {
+  id: string;
+  answers: AnswersType;
 }
 
 const Game = () => {
@@ -44,23 +62,28 @@ const Game = () => {
   const [userName, setUserName] = useState<string | null>(null);
 
   const userNameRef = useRef(userName);
+  const userIdRef = useRef(userId);
 
-  const [answers, setAnswers] = useState({
-    prenom: "",
-    metier: "",
-    geographie: "",
-    marque: "",
-    animal: "",
-    aliment: "",
-    celebrite: "",
+  const [answers, setAnswers] = useState<AnswersType>({
+    prenom: { value: "", vote: [] },
+    metier: { value: "", vote: [] },
+    geographie: { value: "", vote: [] },
+    marque: { value: "", vote: [] },
+    animal: { value: "", vote: [] },
+    aliment: { value: "", vote: [] },
+    celebrite: { value: "", vote: [] },
   });
 
   const answersRef = useRef(answers);
 
+  // Responses
+  const [responses, setResponses] = useState<ResponsesType[][]>([]);
+  const responsesRef = useRef(responses);
+
   const handleInputChange = (champ: string, valeur: string) => {
     setAnswers((prevData) => ({
       ...prevData,
-      [champ]: valeur,
+      [champ]: { value: valeur, vote: [userId] },
     }));
   };
 
@@ -77,7 +100,7 @@ const Game = () => {
     });
 
     socket.on("player_joined", ({ options, player }) => {
-      if (player === userId) {
+      if (player == userIdRef.current) {
         setIsJoined(true);
       }
       setGameParams(options);
@@ -101,7 +124,20 @@ const Game = () => {
     });
 
     socket.on("all_responses_collected", (responses) => {
-      console.log(responses);
+      setResponses(responses);
+      setAnswers({
+        prenom: { value: "", vote: [] },
+        metier: { value: "", vote: [] },
+        geographie: { value: "", vote: [] },
+        marque: { value: "", vote: [] },
+        animal: { value: "", vote: [] },
+        aliment: { value: "", vote: [] },
+        celebrite: { value: "", vote: [] },
+      });
+    });
+
+    socket.on("vote", (res) => {
+      setResponses(res);
     });
   }, []);
 
@@ -112,6 +148,14 @@ const Game = () => {
   useEffect(() => {
     userNameRef.current = userName;
   }, [userName]);
+
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  useEffect(() => {
+    responsesRef.current = responses;
+  }, [responses]);
 
   const handleUserName = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUserName(e.target.value);
@@ -127,7 +171,12 @@ const Game = () => {
 
   return (
     <>
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+      <div
+        className={cn(
+          "min-h-screen flex flex-col items-center justify-center bg-gray-100 gap-4",
+          responses.length > 0 ? "pt-80" : ""
+        )}
+      >
         <Card className="w-full max-w-sm">
           {!isJoined ? (
             <>
@@ -192,9 +241,15 @@ const Game = () => {
             </>
           )}
         </Card>
+
+        <GameResponse
+          id={id!}
+          players={gameParams?.players!}
+          responses={responses}
+          userId={userId!}
+        />
       </div>
     </>
   );
 };
-
 export default Game;

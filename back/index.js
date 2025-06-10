@@ -29,18 +29,17 @@ function updateLastModified(gameId) {
   }
 }
 
-// cron.schedule("*/10 * * * * *", () => {
-//   const now = Date.now();
-//   const threshold = 30 * 1000; // 30 secondes
+cron.schedule("*/10 * * * * *", () => {
+  const now = Date.now();
+  const threshold = 60 * 1000 * 5; // 5 min
 
-//   for (const [gameId, game] of Object.entries(games)) {
-//     if (now - game.lastUpdate > threshold) {
-//       delete games[gameId];
-//       console.log(`Game ${gameId} deleted due to inactivity.`);
-//       io.to(gameId).emit("game_deleted_due_to_inactivity");
-//     }
-//   }
-// });
+  for (const [gameId, game] of Object.entries(games)) {
+    if (now - game.lastUpdate > threshold) {
+      delete games[gameId];
+      io.to(gameId).emit("game_deleted_due_to_inactivity");
+    }
+  }
+});
 
 io.on("connection", (socket) => {
   socket.on("get_id", () => {
@@ -247,7 +246,6 @@ io.on("connection", (socket) => {
       }
     });
 
-    console.log(game.resultats);
     io.to(gameId).emit("game_results", game);
   });
 

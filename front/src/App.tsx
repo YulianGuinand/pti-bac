@@ -4,6 +4,7 @@ import {
   Route,
   RouterProvider,
 } from "react-router-dom";
+import { Toaster } from "../components/ui/sonner";
 import Home from "./pages/Home";
 import Game from "./pages/games/Game";
 
@@ -20,6 +21,7 @@ const App = () => {
   return (
     <>
       <RouterProvider router={router} />
+      <Toaster />
     </>
   );
 };

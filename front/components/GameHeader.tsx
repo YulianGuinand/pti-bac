@@ -21,13 +21,15 @@ const GameHeader = ({ state, players, isHoster, id }: GameHeaderProps) => {
           ? "Round commencé"
           : state === "stopped"
           ? "Round arrêté"
+          : state === "finished"
+          ? "Partie terminée !"
           : "La partie n'a pas encore commencée"}
       </CardTitle>
       <CardDescription>
         Il y a {players?.length} joueur{players?.length > 1 ? "s" : ""} connecté
         {players?.length > 1 ? "s" : ""}
       </CardDescription>
-      {isHoster && state !== "started" && (
+      {isHoster && state !== "started" && state !== "finished" && (
         <CardAction>
           <Button variant="ghost" onClick={handleStart}>
             {state === "stopped" ? "Nouveau round" : "Demarrer la partie"}

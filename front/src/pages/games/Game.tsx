@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { GamePanel } from "../../../components/GamePanel";
 import { GameResponse } from "../../../components/GameResponse";
 import { StartScreen } from "../../../components/StartScreen";
 import { Button } from "../../../components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -55,6 +55,7 @@ interface ResponsesType {
 const Game = () => {
   const { id } = useParams();
   const [userId, setUserId] = useState<string | null>(null);
+  const [gameExist, setGameExist] = useState<boolean>(false);
   const [gameParams, setGameParams] = useState<GameParams | null>(null);
 
   const [isJoined, setIsJoined] = useState(false);
@@ -95,6 +96,13 @@ const Game = () => {
       setUserId(id);
     });
 
+    socket.emit("check_game", id);
+    socket.on("game_found", (state) => {
+      if (state) {
+        setGameExist(true);
+      }
+    });
+
     socket.on("error", (message) => {
       console.error("Erreur reçue :", message);
     });
@@ -111,7 +119,7 @@ const Game = () => {
       setResponses([]);
     });
 
-    socket.on("game_stopped", (option) => {
+    socket.on("round_stopped", (option) => {
       setGameParams({ ...gameParams, ...option });
 
       socket.emit("submit_responses", {
@@ -140,6 +148,16 @@ const Game = () => {
     socket.on("vote", (res) => {
       setResponses(res);
     });
+
+    socket.on("game_deleted_due_to_inactivity", () => {
+      toast.warning("Game deleted due to inactivity !");
+      navigate("/", { replace: true });
+    });
+
+    socket.on("game_results", (game) => {
+      setGameParams({ ...gameParams, ...game });
+      setResponses([]);
+    });
   }, []);
 
   useEffect(() => {
@@ -163,7 +181,7 @@ const Game = () => {
   };
 
   const handleBack = () => {
-    navigate(-1);
+    navigate("/", { replace: true });
   };
 
   const handleJoin = () => {
@@ -178,77 +196,93 @@ const Game = () => {
           responses.length > 0 ? "pt-80" : ""
         )}
       >
-        <Card className="w-full max-w-sm">
-          {!isJoined ? (
-            <>
+        {gameExist ? (
+          <>
+            <Card className="w-full max-w-sm">
+              {!isJoined ? (
+                <>
+                  <CardHeader>
+                    <CardTitle>Rejoindre la partie</CardTitle>
+                    <CardDescription>
+                      Rejoinez la partie de Petit-Bac avec vos amis !
+                    </CardDescription>
+                  </CardHeader>
+                  <StartScreen id={id!} />
+                  <CardFooter>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full">Rejoindre</Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Créer un nom d'utilisateur</DialogTitle>
+                          <DialogDescription>
+                            Vous avez besoin de créer un nom d'utilisateur avant
+                            de créer et jouer !
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4">
+                          <div className="grid gap-3">
+                            <Label htmlFor="username-1">
+                              Nom d'utilisateur :
+                            </Label>
+                            <Input
+                              onChange={handleUserName}
+                              id="username"
+                              placeholder="Nom d'utilisateur"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">Annuler</Button>
+                          </DialogClose>
+                          <Button onClick={handleJoin}>Rejoindre</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </CardFooter>
+                </>
+              ) : (
+                gameParams && (
+                  <>
+                    <GamePanel
+                      gameParams={gameParams}
+                      id={id!}
+                      userId={userId!}
+                      handleInputChange={handleInputChange}
+                      champs={Object.keys(answers)}
+                    />
+                  </>
+                )
+              )}
+            </Card>
+
+            {gameParams?.state !== "finished" ? (
+              <GameResponse
+                id={id!}
+                players={gameParams?.players!}
+                responses={responses}
+                userId={userId!}
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            <Card className="w-full max-w-md">
               <CardHeader>
-                <CardTitle>Rejoindre la partie</CardTitle>
+                <CardTitle>Aucune partie trouvée</CardTitle>
                 <CardDescription>
-                  Rejoinez la partie de Petit-Bac avec vos amis !
+                  Verifiez que vous avez entré le bon code pour rejoindre la
+                  partie.
                 </CardDescription>
               </CardHeader>
-              <StartScreen id={id!} />
-              <CardFooter>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full">Rejoindre</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Créer un nom d'utilisateur</DialogTitle>
-                      <DialogDescription>
-                        Vous avez besoin de créer un nom d'utilisateur avant de
-                        créer et jouer !
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4">
-                      <div className="grid gap-3">
-                        <Label htmlFor="username-1">Nom d'utilisateur :</Label>
-                        <Input
-                          onChange={handleUserName}
-                          id="username"
-                          placeholder="Nom d'utilisateur"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button variant="outline">Annuler</Button>
-                      </DialogClose>
-                      <Button onClick={handleJoin}>Rejoindre</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </CardFooter>
-            </>
-          ) : gameParams ? (
-            <>
-              <GamePanel
-                gameParams={gameParams}
-                id={id!}
-                userId={userId!}
-                handleInputChange={handleInputChange}
-                champs={Object.keys(answers)}
-              />
-            </>
-          ) : (
-            <>
-              <CardContent>
-                <h1>Aucune partie trouvé</h1>
-              </CardContent>
               <CardFooter className="flex-row gap-2">
                 <Button onClick={handleBack}>Retour page principale</Button>
               </CardFooter>
-            </>
-          )}
-        </Card>
-
-        <GameResponse
-          id={id!}
-          players={gameParams?.players!}
-          responses={responses}
-          userId={userId!}
-        />
+            </Card>
+          </>
+        )}
       </div>
     </>
   );

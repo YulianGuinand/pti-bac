@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 
-export const StartScreen = ({ id }: { id: string }) => {
+export const StartScreen = ({ id}: { id: string }) => {
   const [isCopy, setIsCopy] = useState<boolean>(false);
 
   const handleCopy = async () => {

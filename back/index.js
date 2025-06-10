@@ -23,6 +23,25 @@ function getRandomLetter() {
 // Stockage en mémoire
 const games = {};
 
+function updateLastModified(gameId) {
+  if (games[gameId]) {
+    games[gameId].lastUpdate = Date.now();
+  }
+}
+
+// cron.schedule("*/10 * * * * *", () => {
+//   const now = Date.now();
+//   const threshold = 30 * 1000; // 30 secondes
+
+//   for (const [gameId, game] of Object.entries(games)) {
+//     if (now - game.lastUpdate > threshold) {
+//       delete games[gameId];
+//       console.log(`Game ${gameId} deleted due to inactivity.`);
+//       io.to(gameId).emit("game_deleted_due_to_inactivity");
+//     }
+//   }
+// });
+
 io.on("connection", (socket) => {
   socket.on("get_id", () => {
     socket.emit("connected", socket.id);
@@ -30,11 +49,11 @@ io.on("connection", (socket) => {
 
   socket.on("check_game", (gameId) => {
     const game = games[gameId];
+    let isFound = true;
     if (!game) {
-      socket.emit("error", "Game not found");
-    } else {
-      socket.emit("game_found", true);
+      isFound = false;
     }
+    socket.emit("game_found", isFound);
   });
 
   socket.on("create_game", () => {
@@ -44,6 +63,7 @@ io.on("connection", (socket) => {
       host: socket.id,
       responses: [],
       roundes: 0,
+      lastUpdate: Date.now(),
     };
     socket.join(gameId);
     socket.emit("game_created", gameId);
@@ -64,6 +84,7 @@ io.on("connection", (socket) => {
       }
 
       socket.join(gameId);
+      updateLastModified(gameId);
       io.to(gameId).emit("player_joined", {
         options: games[gameId],
         player: socket.id,
@@ -102,6 +123,7 @@ io.on("connection", (socket) => {
     game.startTime = Date.now();
     game.duration = duration;
     game.roundes += 1;
+    updateLastModified(gameId);
 
     io.to(gameId).emit("game_started", games[gameId]);
   });
@@ -110,41 +132,123 @@ io.on("connection", (socket) => {
     Object.keys(games).forEach((gameId) => {
       const game = games[gameId];
 
-      // Trouver l'index du joueur à retirer
       const index = game.players.findIndex((player) => player.id === socket.id);
 
-      // Retirer le joueur s'il est trouvé
       if (index !== -1) {
+        const wasHost = game.host === socket.id;
+
+        // Retirer le joueur déconnecté
         game.players.splice(index, 1);
 
-        // Optionnel : supprimer le jeu si plus de joueurs
-        // if (game.players.length === 0) {
-        //   delete games[gameId];
-        // }
+        // S'il n'y a plus de joueurs, on supprime la partie
+        if (game.players.length === 0) {
+          delete games[gameId];
+          return;
+        }
 
-        // Informer les autres joueurs
+        // Si c'était le host, on attribue un nouveau host
+        if (wasHost) {
+          game.host = game.players[0].id; // Premier joueur restant devient host
+        }
+        updateLastModified(gameId);
+
+        // Notifier les clients qu'un joueur a quitté
         io.to(gameId).emit("player_quit", game);
       }
     });
   });
 
-  socket.on("game_stop", (gameId) => {
+  socket.on("round_stop", (gameId) => {
     const game = games[gameId];
     if (!game) socket.emit("error", "Game not found");
 
     if (game.state === "started") {
       game.state = "stopped";
-      io.to(gameId).emit("game_stopped", game);
+      updateLastModified(gameId);
+      io.to(gameId).emit("round_stopped", game);
     } else {
       socket.emit("error", "game not started or already stopped");
     }
   });
 
-  socket.on("game_finished", (gameId) => {
+  socket.on("game_finish", (gameId) => {
     const game = games[gameId];
-    if (!game) socket.emit("error", "Game not found");
+    if (!game) return socket.emit("error", "Game not found");
+
     game.state = "finished";
-    io.to(gameId).emit("game_stopped", game);
+    const responses = game.responses;
+    game.resultats = {};
+
+    responses.forEach((round) => {
+      const nbPlayerRound = round.length;
+      const lettre = round.letter.toLowerCase(); // On suppose que round a une propriété lettre
+
+      // Initialiser les résultats de chaque joueur
+      const playerPoints = {};
+
+      round.forEach((player) => {
+        playerPoints[player.id] = 0;
+      });
+
+      const champs = [
+        "prenom",
+        "metier",
+        "geographie",
+        "marque",
+        "animal",
+        "aliment",
+        "celebrite",
+      ];
+
+      champs.forEach((champ) => {
+        // Pour détecter les doublons
+        const valueMap = {}; // { "Wagner": [playerId1, playerId2] }
+
+        round.forEach((player) => {
+          const val = player.answers[champ]?.value?.trim().toLowerCase();
+          if (val) {
+            if (!valueMap[val]) valueMap[val] = [];
+            valueMap[val].push(player.id);
+          }
+        });
+
+        round.forEach((player) => {
+          const answer = player.answers[champ];
+          const val = answer?.value?.trim();
+          if (!val || !val.toLowerCase().startsWith(lettre)) {
+            return; // Pas de point si ça ne commence pas par la bonne lettre
+          }
+
+          const voteCount = answer.vote.length;
+          const hasMajority = voteCount > nbPlayerRound / 2;
+
+          if (hasMajority) {
+            playerPoints[player.id] += 10;
+          }
+
+          const otherUsersSameAnswer = valueMap[val.toLowerCase()];
+          if (otherUsersSameAnswer && otherUsersSameAnswer.length > 1) {
+            // Attribuer +5 à chaque joueur ayant la même réponse
+            otherUsersSameAnswer.forEach((id) => {
+              playerPoints[id] += 5;
+            });
+          }
+        });
+      });
+
+      // Stocker les résultats
+      for (const [id, point] of Object.entries(playerPoints)) {
+        const res = game.resultats[id];
+        if (!res) {
+          game.resultats[id] = point;
+        } else {
+          game.resultats[id] += point;
+        }
+      }
+    });
+
+    console.log(game.resultats);
+    io.to(gameId).emit("game_results", game);
   });
 
   socket.on("submit_responses", ({ gameId, answers }) => {
@@ -165,6 +269,7 @@ io.on("connection", (socket) => {
 
     const currentRound = game.responses[currentRoundIndex];
 
+    currentRound.letter = game.letter.toLowerCase();
     const hasAlreadySubmitted = currentRound.some(
       (response) => response.id === socket.id
     );
@@ -177,6 +282,7 @@ io.on("connection", (socket) => {
     const allResponded =
       game.responses[currentRoundIndex].length === game.players.length;
 
+    updateLastModified(gameId);
     if (allResponded) {
       io.to(gameId).emit("all_responses_collected", game.responses);
     }

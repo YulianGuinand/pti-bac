@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3001"); // Change avec URL Render en prod
+const socket = io("https://pti-bac.onrender.com:3001");
 
 export default socket;

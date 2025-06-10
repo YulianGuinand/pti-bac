@@ -36,6 +36,7 @@ cron.schedule("*/10 * * * * *", () => {
   for (const [gameId, game] of Object.entries(games)) {
     if (now - game.lastUpdate > threshold) {
       delete games[gameId];
+      console.log("Game deleted due to inactivity : ", gameId);
       io.to(gameId).emit("game_deleted_due_to_inactivity");
     }
   }

@@ -3,14 +3,25 @@ import { Button } from "./ui/button";
 import { CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 
-export const StartScreen = ({ id}: { id: string }) => {
+export const StartScreen = ({ id }: { id: string }) => {
   const [isCopy, setIsCopy] = useState<boolean>(false);
+  const [isCodeCopy, setIsCodeCopy] = useState<boolean>(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(`http://localhost:5173/game/${id}`);
+    await navigator.clipboard.writeText(
+      `https://petit-bac-yulian.netlify.app/game/game/${id}`
+    );
     setIsCopy(true);
     setTimeout(() => {
       setIsCopy(false);
+    }, 1500);
+  };
+
+  const handleCodeCopy = async () => {
+    await navigator.clipboard.writeText(id);
+    setIsCodeCopy(true);
+    setTimeout(() => {
+      setIsCodeCopy(false);
     }, 1500);
   };
   return (
@@ -20,7 +31,7 @@ export const StartScreen = ({ id}: { id: string }) => {
         <Input
           disabled
           type="text"
-          value={`http://localhost:5173/game/${id}`}
+          value={`https://petit-bac-yulian.netlify.app/game/${id}`}
           className="rounded-r-none"
         />
         <Button
@@ -29,6 +40,21 @@ export const StartScreen = ({ id}: { id: string }) => {
           disabled={isCopy}
         >
           {isCopy ? "Succès" : "Copier"}
+        </Button>
+      </div>
+      <div className="w-full flex flex-row">
+        <Input
+          disabled
+          type="text"
+          value={id}
+          className="rounded-r-none flex-1"
+        />
+        <Button
+          onClick={handleCodeCopy}
+          className="rounded-l-none"
+          disabled={isCodeCopy}
+        >
+          {isCodeCopy ? "Succès" : "Copier"}
         </Button>
       </div>
     </CardContent>

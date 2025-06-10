@@ -39,7 +39,7 @@ function updateLastModified(gameId) {
   }
 }
 
-cron.schedule("*/10 * * * * *", () => {
+cron.schedule("* * * * * *", () => {
   const now = Date.now();
   const threshold = 60 * 1000 * 5; // 5 min
 

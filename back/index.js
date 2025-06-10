@@ -9,7 +9,7 @@ const server = http.createServer(app);
 
 const corsOptions = {
   origin: "https://petit-bac-yulian.netlify.app",
-  methods: ["GET", "POST"],
+  methods: ["*"],
   credentials: true,
 };
 
@@ -18,7 +18,7 @@ app.use(cors(corsOptions));
 const io = require("socket.io")(server, {
   cors: {
     origin: "https://petit-bac-yulian.netlify.app",
-    methods: ["GET", "POST"],
+    methods: ["*"],
     credentials: true,
   },
 });

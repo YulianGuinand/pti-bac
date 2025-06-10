@@ -7,11 +7,19 @@ const cron = require("node-cron");
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors());
+const corsOptions = {
+  origin: "https://petit-bac-yulian.netlify.app",
+  methods: ["GET", "POST"],
+  credentials: true,
+};
 
-const io = new Server(server, {
+app.use(cors(corsOptions));
+
+const io = require("socket.io")(server, {
   cors: {
-    origin: "*",
+    origin: "https://petit-bac-yulian.netlify.app",
+    methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 

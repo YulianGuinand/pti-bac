@@ -50,10 +50,11 @@ cron.schedule("*/10 * * * * *", () => {
       io.to(gameId).emit("game_deleted_due_to_inactivity");
     }
   }
+
+  console.log("Tâche cron effectué");
 });
 
 io.on("connection", (socket) => {
-  console.log("Connected : ", socket.id);
   socket.on("get_id", () => {
     socket.emit("connected", socket.id);
   });

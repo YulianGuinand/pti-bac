@@ -9,7 +9,9 @@ const server = http.createServer(app);
 
 const corsOptions = {
   origin: "https://petit-bac-yulian.netlify.app",
-  methods: ["*"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  transports: ["websocket"],
 };
 
 app.use(cors(corsOptions));
@@ -17,7 +19,8 @@ app.use(cors(corsOptions));
 const io = require("socket.io")(server, {
   cors: {
     origin: "https://petit-bac-yulian.netlify.app",
-    methods: ["*"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
     transports: ["websocket"],
   },
 });
@@ -50,6 +53,7 @@ cron.schedule("*/10 * * * * *", () => {
 });
 
 io.on("connection", (socket) => {
+  console.log("Connected : ", socket.id);
   socket.on("get_id", () => {
     socket.emit("connected", socket.id);
   });

@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 
 const corsOptions = {
-  origin: "https://petit-bac-yulian.netlify.app",
+  origin: ["https://petit-bac-yulian.netlify.app", "http://localhost"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
   transports: ["websocket"],
@@ -18,7 +18,7 @@ app.use(cors(corsOptions));
 
 const io = require("socket.io")(server, {
   cors: {
-    origin: "https://petit-bac-yulian.netlify.app",
+    origin: ["https://petit-bac-yulian.netlify.app", "http://localhost"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     transports: ["websocket"],

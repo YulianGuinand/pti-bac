@@ -39,7 +39,7 @@ function updateLastModified(gameId) {
   }
 }
 
-cron.schedule("* * * * * *", () => {
+cron.schedule("*/30 * * * * *", () => {
   const now = Date.now();
   const threshold = 60 * 1000 * 5; // 5 min
 
@@ -102,14 +102,14 @@ io.on("connection", (socket) => {
         player: socket.id,
       });
     } else {
-      socket.emit("error", "Game not found");
+      // socket.emit("error", "Game not found");
     }
   });
 
   socket.on("start_game", (gameId) => {
     const game = games[gameId];
     if (!game) {
-      socket.emit("error", "Game not found");
+      // socket.emit("error", "Game not found");
       return;
     }
 
@@ -172,7 +172,7 @@ io.on("connection", (socket) => {
 
   socket.on("round_stop", (gameId) => {
     const game = games[gameId];
-    if (!game) socket.emit("error", "Game not found");
+    // if (!game) socket.emit("error", "Game not found");
 
     if (game.state === "started") {
       game.state = "stopped";
@@ -185,7 +185,7 @@ io.on("connection", (socket) => {
 
   socket.on("game_finish", (gameId) => {
     const game = games[gameId];
-    if (!game) return socket.emit("error", "Game not found");
+    // if (!game) return socket.emit("error", "Game not found");
 
     game.state = "finished";
     const responses = game.responses;
@@ -265,7 +265,7 @@ io.on("connection", (socket) => {
   socket.on("submit_responses", ({ gameId, answers }) => {
     const game = games[gameId];
     if (!game) {
-      socket.emit("error", "Game not found");
+      // socket.emit("error", "Game not found");
       return;
     }
 
@@ -279,6 +279,8 @@ io.on("connection", (socket) => {
     }
 
     const currentRound = game.responses[currentRoundIndex];
+
+    console.log(game);
 
     currentRound.letter = game.letter.toLowerCase();
     const hasAlreadySubmitted = currentRound.some(

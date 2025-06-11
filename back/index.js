@@ -25,9 +25,18 @@ const io = require("socket.io")(server, {
   },
 });
 
-function getRandomLetter() {
+function getUniqueRandomLetter(existingLetters) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  return alphabet[Math.floor(Math.random() * alphabet.length)];
+  const availableLetters = alphabet
+    .split("")
+    .filter((letter) => !existingLetters.includes(letter));
+
+  if (availableLetters.length === 0) {
+    throw new Error("Toutes les lettres ont déjà été utilisées.");
+  }
+
+  const randomIndex = Math.floor(Math.random() * availableLetters.length);
+  return availableLetters[randomIndex];
 }
 
 // Stockage en mémoire
@@ -51,7 +60,7 @@ cron.schedule("*/30 * * * * *", () => {
     }
   }
 
-  console.log("Tâche cron effectué");
+  console.log("Games en cours : ", games);
 });
 
 io.on("connection", (socket) => {
@@ -76,6 +85,7 @@ io.on("connection", (socket) => {
       responses: [],
       roundes: 0,
       lastUpdate: Date.now(),
+      letters: [],
     };
     socket.join(gameId);
     socket.emit("game_created", gameId);
@@ -102,14 +112,14 @@ io.on("connection", (socket) => {
         player: socket.id,
       });
     } else {
-      // socket.emit("error", "Game not found");
+      socket.emit("error", "Game not found");
     }
   });
 
   socket.on("start_game", (gameId) => {
     const game = games[gameId];
     if (!game) {
-      // socket.emit("error", "Game not found");
+      socket.emit("error", "Game not found");
       return;
     }
 
@@ -127,11 +137,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const letter = getRandomLetter();
+    const letter = getUniqueRandomLetter(game.letters);
+
     const duration = 60; // secondes
 
     game.state = "started";
     game.letter = letter;
+    game.letters.push(letter);
     game.startTime = Date.now();
     game.duration = duration;
     game.roundes += 1;
@@ -172,7 +184,7 @@ io.on("connection", (socket) => {
 
   socket.on("round_stop", (gameId) => {
     const game = games[gameId];
-    // if (!game) socket.emit("error", "Game not found");
+    if (!game) socket.emit("error", "Game not found");
 
     if (game.state === "started") {
       game.state = "stopped";
@@ -185,7 +197,7 @@ io.on("connection", (socket) => {
 
   socket.on("game_finish", (gameId) => {
     const game = games[gameId];
-    // if (!game) return socket.emit("error", "Game not found");
+    if (!game) return socket.emit("error", "Game not found");
 
     game.state = "finished";
     const responses = game.responses;
@@ -265,35 +277,39 @@ io.on("connection", (socket) => {
   socket.on("submit_responses", ({ gameId, answers }) => {
     const game = games[gameId];
     if (!game) {
-      // socket.emit("error", "Game not found");
+      socket.emit("error", "Game not found");
       return;
     }
 
     const playerId = socket.id;
+    const currentRoundIndex = game.roundes - 1;
 
-    // Déterminer le round actuel (index du dernier round en cours)
-    let currentRoundIndex = game.roundes - 1;
-
-    if (game.responses.length < game.roundes) {
-      game.responses.push([{ id: playerId, answers }]);
+    if (!game.responses[currentRoundIndex]) {
+      game.responses[currentRoundIndex] = [];
     }
 
     const currentRound = game.responses[currentRoundIndex];
 
-    console.log(game);
-
-    currentRound.letter = game.letter.toLowerCase();
     const hasAlreadySubmitted = currentRound.some(
-      (response) => response.id === socket.id
+      (response) => response.id === playerId
     );
 
     if (!hasAlreadySubmitted) {
-      currentRound.push({ id: socket.id, answers });
+      currentRound.push({ id: playerId, answers });
     }
 
-    // // Vérifie si tous les joueurs ont répondu pour ce round
-    const allResponded =
-      game.responses[currentRoundIndex].length === game.players.length;
+    currentRound.letter = game.letter.toLowerCase();
+
+    currentRound.forEach((res) => {
+      if (res.id === playerId) return;
+      Object.values(res.answers).forEach((value) => {
+        if (value.value.length > 0 && !value.vote.includes(playerId)) {
+          value.vote.push(playerId);
+        }
+      });
+    });
+
+    const allResponded = currentRound.length === game.players.length;
 
     updateLastModified(gameId);
     if (allResponded) {

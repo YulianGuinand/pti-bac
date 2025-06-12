@@ -57,7 +57,7 @@ function Home() {
 
   return (
     <>
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-2">
         <Card className="max-w-sm w-full">
           <CardHeader>
             <CardTitle>Bienvue sur le jeu du Petit-Bac</CardTitle>

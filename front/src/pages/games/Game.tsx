@@ -192,7 +192,7 @@ const Game = () => {
     <>
       <div
         className={cn(
-          "min-h-screen flex flex-col items-center justify-center bg-gray-100 gap-4",
+          "min-h-screen flex flex-col items-center justify-center bg-gray-100 gap-4 px-2",
           responses.length > 0 ? "pt-80" : ""
         )}
       >
@@ -258,10 +258,10 @@ const Game = () => {
               )}
             </Card>
 
-            {gameParams?.state !== "finished" ? (
+            {gameParams && gameParams?.state !== "finished" ? (
               <GameResponse
                 id={id!}
-                players={gameParams?.players!}
+                players={gameParams.players!}
                 responses={responses}
                 userId={userId!}
               />
